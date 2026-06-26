@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Симулятор Мікроскопа</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-deep:   #0A1628;
+            --bg-panel:  #111D30;
+            --bg-card:   #162036;
+            --bg-hover:  #1C2A44;
+            --accent:    #00D97E;
+            --amber:     #F5A623;
+            --text-hi:   #EDF2F8;
+            --text-mid:  #8FA3BC;
+            --text-lo:   #4A6080;
+            --border:    rgba(200,216,228,0.08);
+            --border-hi: rgba(200,216,228,0.18);
+            --glow:      0 0 24px rgba(0,217,126,0.25);
+            --radius:    10px;
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg-deep);
+            color: var(--text-hi);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        /* ════════════════════════════════
+           APP SHELL  — Desktop 3-col grid
+           ════════════════════════════════ */
+        .app {
+            display: grid;
+            grid-template-rows: 52px 1fr;
+            grid-template-columns: 210px 1fr 270px;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── TOPBAR ── */
+        .topbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
+            z-index: 50;
+        }
+
+        .topbar-brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+
+        .brand-icon {
+            width: 26px; height: 26px;
+            background: var(--accent); border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; flex-shrink: 0;
+        }
+
+        .brand-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700; font-size: 14px; letter-spacing: 0.03em;
+        }
+        .brand-name span { color: var(--accent); }
+
+        .topbar-center {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+
+        .topbar-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px; font-weight: 500;
+            color: var(--text-lo);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .topbar-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+        .lang-btn {
+            background: none; border: 1px solid var(--border-hi);
+            color: var(--text-mid);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+            padding: 4px 10px; border-radius: 4px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-btn.active, .lang-btn:hover {
+            background: var(--accent); border-color: var(--accent); color: #000;
+        }
+
+        .help-btn {
+            background: none; border: 1px solid var(--border-hi);
+            color: var(--text-mid);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 11px; font-weight: 600;
+            padding: 4px 10px; border-radius: 4px; cursor: pointer;
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .help-btn:hover { background: var(--bg-hover); color: var(--text-hi); }
+
+        /* ── LEFT PANEL — SLIDES ── */
+        .panel-slides {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            padding: 16px 12px; gap: 10px;
+            overflow-y: auto;
+        }
+
+        .panel-label {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px; font-weight: 600;
+            letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--text-lo); padding: 0 4px; margin-bottom: 2px;
+        }
+
+        .slide-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius); overflow: hidden;
+            cursor: pointer; transition: all 0.2s;
+            background: var(--bg-card); flex-shrink: 0;
+        }
+        .slide-card:hover { border-color: var(--border-hi); background: var(--bg-hover); }
+        .slide-card.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(0,217,126,0.15);
+        }
+        .slide-thumb {
+            width: 100%; height: 72px; object-fit: cover;
+            display: block; opacity: 0.8; transition: opacity 0.2s;
+        }
+        .slide-card:hover .slide-thumb,
+        .slide-card.active .slide-thumb { opacity: 1; }
+        .slide-info { padding: 7px 9px; }
+        .slide-num {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 8px; font-weight: 700;
+            letter-spacing: 0.12em; color: var(--accent);
+            text-transform: uppercase; margin-bottom: 2px;
+        }
+        .slide-name {
+            font-size: 10px; font-weight: 500;
+            color: var(--text-hi); line-height: 1.35;
+        }
+
+        /* ── CENTER ── */
+        .viewport {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: var(--bg-deep);
+            position: relative; gap: 20px;
+            overflow: hidden;
+        }
+
+        /* Eyepiece */
+        .eyepiece-wrap {
+            position: relative;
+            /* clamp: min 200px, preferred 52vh or 46vw, max 480px */
+            width: clamp(200px, min(52vh, 46vw), 480px);
+            aspect-ratio: 1;
+            flex-shrink: 0;
+        }
+
+        .eyepiece-outer {
+            position: absolute; inset: 0; border-radius: 50%;
+            background: conic-gradient(
+                from 0deg,
+                #1A2A3C 0deg, #243448 30deg, #2E4060 60deg,
+                #1A2A3C 90deg, #243448 150deg, #1E3050 180deg,
+                #2E4060 240deg, #243448 300deg, #1A2A3C 360deg
+            );
+            box-shadow:
+                0 0 0 3px #0A1220,
+                0 0 0 5px #243040,
+                0 0 0 7px #0A1220,
+                0 20px 60px rgba(0,0,0,0.7),
+                0 0 80px rgba(0,217,126,0.04);
+        }
+
+        .eyepiece-inner {
+            position: absolute; inset: 10px; border-radius: 50%;
+            background: radial-gradient(circle at 30% 25%, #152030 0%, #080F1A 60%, #040912 100%);
+            overflow: hidden;
+        }
+
+        .specimen-img {
+            position: absolute;
+            width: 150%; height: 150%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            object-fit: cover; pointer-events: none;
+            z-index: 1; transition: opacity 0.35s ease;
+        }
+
+        .reticle-img {
+            position: absolute; inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover; pointer-events: none;
+            z-index: 2; transition: opacity 0.2s;
+        }
+
+        .glass-overlay {
+            position: absolute; inset: 0; border-radius: 50%;
+            pointer-events: none; z-index: 3;
+            background:
+                radial-gradient(circle at 28% 22%, rgba(255,255,255,0.07) 0%, transparent 40%),
+                radial-gradient(circle at 76% 80%, rgba(255,255,255,0.03) 0%, transparent 30%),
+                radial-gradient(circle at 50% 50%, transparent 55%, rgba(0,0,0,0.88) 100%);
+        }
+        .glass-overlay::after {
+            content: '';
+            position: absolute; top: 8%; left: 15%;
+            width: 30%; height: 13%;
+            background: radial-gradient(ellipse, rgba(255,255,255,0.13) 0%, transparent 100%);
+            border-radius: 50%; transform: rotate(-25deg);
+        }
+
+        .drag-zone {
+            position: absolute; inset: 10px; border-radius: 50%;
+            z-index: 4; cursor: grab; touch-action: none;
+        }
+        .drag-zone:active { cursor: grabbing; }
+
+        .specimen-badge {
+            position: absolute; bottom: -16px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-panel); border: 1px solid var(--border-hi);
+            border-radius: 20px; padding: 4px 13px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 10px; font-weight: 500;
+            color: var(--text-mid); white-space: nowrap;
+            letter-spacing: 0.02em; z-index: 5;
+        }
+
+        /* Mag row */
+        .mag-row { display: flex; gap: 7px; align-items: center; flex-shrink: 0; }
+        .mag-label {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px; font-weight: 600;
+            letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--text-lo); margin-right: 3px;
+        }
+        .mag-btn {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+            padding: 5px 14px; border-radius: 6px;
+            border: 1px solid var(--border-hi);
+            background: var(--bg-card); color: var(--text-mid);
+            cursor: pointer; transition: all 0.2s;
+        }
+        .mag-btn:hover { background: var(--bg-hover); color: var(--text-hi); }
+        .mag-btn.active {
+            background: var(--accent); border-color: var(--accent);
+            color: #000; box-shadow: var(--glow);
+        }
+
+        /* ── RIGHT PANEL ── */
+        .panel-controls {
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            padding: 16px 16px;
+            display: flex; flex-direction: column; gap: 18px;
+            overflow-y: auto;
+        }
+
+        .ctrl-section { display: flex; flex-direction: column; gap: 10px; }
+
+        .ctrl-label {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 9px; font-weight: 600;
+            letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--text-lo);
+        }
+
+        .slider-row { display: flex; flex-direction: column; gap: 5px; }
+        .slider-name {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 11px; color: var(--text-mid);
+        }
+        .slider-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 10px; font-weight: 600; color: var(--accent);
+            min-width: 30px; text-align: right;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none;
+            width: 100%; height: 4px; border-radius: 2px;
+            background: var(--bg-hover); outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 13px; height: 13px; border-radius: 50%;
+            background: var(--accent); border: 2px solid var(--bg-deep);
+            box-shadow: 0 0 5px rgba(0,217,126,0.4);
+            transition: transform 0.15s; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.25); }
+        input[type="range"]::-moz-range-thumb {
+            width: 13px; height: 13px; border-radius: 50%;
+            background: var(--accent); border: 2px solid var(--bg-deep); cursor: pointer;
+        }
+
+        /* D-PAD */
+        .dpad {
+            display: grid;
+            grid-template-areas: ". u ." "l . r" ". d .";
+            gap: 5px; width: fit-content; margin: 0 auto;
+        }
+        .dpad-btn {
+            width: 38px; height: 38px;
+            background: var(--bg-card); border: 1px solid var(--border-hi);
+            border-radius: 8px; color: var(--text-mid);
+            font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; user-select: none;
+        }
+        .dpad-btn:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+        .dpad-btn:active { transform: scale(0.88); }
+        .dpad-up    { grid-area: u; }
+        .dpad-down  { grid-area: d; }
+        .dpad-left  { grid-area: l; }
+        .dpad-right { grid-area: r; }
+
+        .divider { height: 1px; background: var(--border); margin: 0 -16px; }
+
+        /* Status */
+        .status-row {
+            display: flex; align-items: center; gap: 6px;
+            padding: 7px 10px; background: var(--bg-card);
+            border-radius: 8px; border: 1px solid var(--border);
+        }
+        .status-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent); box-shadow: 0 0 6px var(--accent);
+            animation: pulse 2s ease-in-out infinite; flex-shrink: 0;
+        }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.35} }
+        .status-text { font-size: 10px; color: var(--text-mid); }
+
+        /* Specimen info */
+        .spec-info {
+            font-size: 10px; color: var(--text-mid);
+            line-height: 1.65; font-style: italic;
+        }
+
+        /* ── INSTRUCTIONS MODAL ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.75);
+            align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-hi);
+            border-radius: 14px;
+            padding: 24px 26px;
+            max-width: 560px; width: 100%;
+            max-height: 88vh; overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute; top: 14px; right: 16px;
+            background: none; border: none;
+            color: var(--text-lo); font-size: 20px;
+            cursor: pointer; line-height: 1;
+            transition: color 0.2s;
+        }
+        .modal-close:hover { color: var(--text-hi); }
+
+        .modal-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 16px; font-weight: 700;
+            color: var(--accent); margin-bottom: 16px;
+            padding-right: 28px;
+        }
+
+        .instr-section { margin-bottom: 16px; }
+        .instr-heading {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 10px; font-weight: 700;
+            letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--text-lo); margin-bottom: 8px;
+        }
+
+        .instr-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+        .instr-list li {
+            display: flex; gap: 10px; align-items: flex-start;
+            font-size: 12px; color: var(--text-mid); line-height: 1.5;
+        }
+        .instr-list li .icon {
+            flex-shrink: 0; font-size: 14px; margin-top: 1px;
+        }
+
+        .kbd {
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--bg-card); border: 1px solid var(--border-hi);
+            border-radius: 4px; padding: 1px 6px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 10px; font-weight: 600;
+            color: var(--text-hi); white-space: nowrap;
+        }
+
+        /* ════════════════════════════════
+           RESPONSIVE BREAKPOINTS
+           ════════════════════════════════ */
+
+        /* ── Laptop / small desktop  ≤ 1280px ── */
+        @media (max-width: 1280px) {
+            .app {
+                grid-template-columns: 190px 1fr 245px;
+            }
+        }
+
+        /* ── Tablet landscape  ≤ 1024px ── */
+        @media (max-width: 1024px) {
+            .app {
+                grid-template-columns: 170px 1fr 220px;
+            }
+            .eyepiece-wrap {
+                width: clamp(180px, min(44vh, 40vw), 380px);
+            }
+            .slide-thumb { height: 60px; }
+            .panel-slides { padding: 12px 10px; }
+            .panel-controls { padding: 14px 13px; }
+        }
+
+        /* ── Tablet portrait  ≤ 768px ── */
+        @media (max-width: 768px) {
+            html, body { overflow: auto; }
+
+            .app {
+                display: flex; flex-direction: column;
+                height: auto; min-height: 100vh; overflow: visible;
+            }
+
+            .topbar { position: sticky; top: 0; z-index: 100; }
+            .topbar-title { display: none; }
+
+            /* Slides — horizontal scroll row */
+            .panel-slides {
+                flex-direction: row; overflow-x: auto; overflow-y: hidden;
+                padding: 10px 12px; gap: 10px;
+                border-right: none; border-bottom: 1px solid var(--border);
+                scrollbar-width: thin;
+            }
+            .panel-label { display: none; }
+            .slide-card { min-width: 120px; flex-shrink: 0; }
+            .slide-thumb { height: 56px; }
+
+            /* Viewport */
+            .viewport { padding: 28px 16px 46px; gap: 18px; }
+            .eyepiece-wrap { width: clamp(220px, 72vw, 380px); }
+
+            /* Controls — 2-col grid */
+            .panel-controls {
+                border-left: none; border-top: 1px solid var(--border);
+                padding: 16px 14px; gap: 14px;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                align-items: start;
+            }
+            .panel-controls .status-row  { grid-column: 1 / -1; }
+            .panel-controls .divider      { grid-column: 1 / -1; }
+            .panel-controls .ctrl-section:last-child { grid-column: 1 / -1; }
+        }
+
+        /* ── Mobile  ≤ 480px ── */
+        @media (max-width: 480px) {
+            .eyepiece-wrap { width: 80vw; max-width: 320px; }
+
+            .panel-controls {
+                grid-template-columns: 1fr;
+            }
+            .panel-controls .ctrl-section:last-child { grid-column: 1; }
+
+            .dpad-btn { width: 42px; height: 42px; }
+            .mag-btn  { padding: 6px 12px; font-size: 11px; }
+        }
+
+        /* ── Small phone  ≤ 360px ── */
+        @media (max-width: 360px) {
+            .eyepiece-wrap { width: 84vw; }
+            .brand-name { font-size: 12px; }
+        }
+
+        /* ── Large / 4K digital panels  ≥ 1600px ── */
+        @media (min-width: 1600px) {
+            .app {
+                grid-template-columns: 260px 1fr 300px;
+                grid-template-rows: 64px 1fr;
+            }
+            .topbar { padding: 0 32px; }
+            .brand-name { font-size: 17px; }
+            .panel-slides { padding: 22px 16px; gap: 14px; }
+            .slide-thumb { height: 100px; }
+            .slide-name { font-size: 12px; }
+            .panel-controls { padding: 22px 20px; gap: 24px; }
+            .ctrl-label { font-size: 10px; }
+            .slider-name { font-size: 13px; }
+            .dpad-btn { width: 46px; height: 46px; font-size: 16px; }
+            .mag-btn { font-size: 14px; padding: 7px 18px; }
+            .eyepiece-wrap { width: clamp(300px, min(60vh, 52vw), 600px); }
+        }
+
+        /* ── Ultra-wide / TV panels  ≥ 2000px ── */
+        @media (min-width: 2000px) {
+            .app { grid-template-columns: 320px 1fr 360px; grid-template-rows: 72px 1fr; }
+            .eyepiece-wrap { width: clamp(400px, min(58vh, 48vw), 720px); }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- ── TOPBAR ── -->
+    <header class="topbar">
+        <div class="topbar-brand">
+            <div class="brand-icon">🔬</div>
+            <div class="brand-name">Micro<span>Lab</span></div>
+        </div>
+        <div class="topbar-center">
+            <div class="topbar-title" data-i18n="subtitle">Simulator · Biology · Grade 7</div>
+        </div>
+        <div class="topbar-meta">
+            <button class="help-btn" id="help-btn" data-i18n="helpBtn">📖 Інструкція</button>
+            <button class="lang-btn" data-lang="ua">UA</button>
+            <button class="lang-btn active" data-lang="en">EN</button>
+        </div>
+    </header>
+
+    <!-- ── LEFT: SLIDES ── -->
+    <aside class="panel-slides">
+        <div class="panel-label" data-i18n="slides">Specimens</div>
+
+        <div class="slide-card active" data-slide="1">
+            <img class="slide-thumb" src="https://i.postimg.cc/15RHphCw/slide1.png" alt="Slide 1" loading="lazy">
+            <div class="slide-info">
+                <div class="slide-num">01</div>
+                <div class="slide-name" data-slide-name="1">Frog's Blood</div>
+            </div>
+        </div>
+
+        <div class="slide-card" data-slide="2">
+            <img class="slide-thumb" src="https://i.postimg.cc/xTsP5xh7/slide2.png" alt="Slide 2" loading="lazy">
+            <div class="slide-info">
+                <div class="slide-num">02</div>
+                <div class="slide-name" data-slide-name="2">Simple Columnar Epithelium</div>
+            </div>
+        </div>
+
+        <div class="slide-card" data-slide="3">
+            <img class="slide-thumb" src="https://i.postimg.cc/qvSxVtkx/slide3.png" alt="Slide 3" loading="lazy">
+            <div class="slide-info">
+                <div class="slide-num">03</div>
+                <div class="slide-name" data-slide-name="3">Human Artery, Vein & Nerve</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ── CENTER: EYEPIECE ── -->
+    <main class="viewport">
+        <div class="eyepiece-wrap">
+            <div class="eyepiece-outer"></div>
+            <div class="eyepiece-inner">
+                <img id="specimen-image" class="specimen-img"
+                     src="https://i.postimg.cc/66nYy7sb/2025-06-12-234612.png" alt="Specimen">
+                <img id="reticle" class="reticle-img"
+                     src="https://i.postimg.cc/j2c4GZ5D/reticle.png" alt="Reticle">
+                <div class="glass-overlay"></div>
+                <div class="drag-zone" id="drag-zone"></div>
+            </div>
+            <div class="specimen-badge" id="specimen-badge">Frog's Blood</div>
+        </div>
+
+        <div class="mag-row">
+            <span class="mag-label" data-i18n="mag">Mag</span>
+            <button class="mag-btn active" data-mag="3x">3×</button>
+            <button class="mag-btn" data-mag="10x">10×</button>
+            <button class="mag-btn" data-mag="40x">40×</button>
+        </div>
+    </main>
+
+    <!-- ── RIGHT: CONTROLS ── -->
+    <aside class="panel-controls">
+
+        <div class="status-row">
+            <div class="status-dot"></div>
+            <span class="status-text" data-i18n="ready">System ready</span>
+        </div>
+
+        <!-- Optics -->
+        <div class="ctrl-section">
+            <div class="ctrl-label" data-i18n="optics">Optics</div>
+
+            <div class="slider-row">
+                <div class="slider-name">
+                    <span>🧪 <span data-i18n="specFocus">Specimen focus</span></span>
+                    <span class="slider-val" id="val-focus">5</span>
+                </div>
+                <input id="specimen-focus" type="range" min="0" max="10" value="5">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-name">
+                    <span>📏 <span data-i18n="reticleFocus">Reticle</span></span>
+                    <span class="slider-val" id="val-reticle">50%</span>
+                </div>
+                <input id="reticle-focus" type="range" min="0" max="1" step="0.01" value="0.5">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-name">
+                    <span>💡 <span data-i18n="lamp">Illumination</span></span>
+                    <span class="slider-val" id="val-lamp">100%</span>
+                </div>
+                <input id="lamp-intensity" type="range" min="0.1" max="2" step="0.01" value="1.05">
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Stage -->
+        <div class="ctrl-section">
+            <div class="ctrl-label" data-i18n="stage">Stage</div>
+            <div class="dpad">
+                <button class="dpad-btn dpad-up"    data-move="up">↑</button>
+                <button class="dpad-btn dpad-left"  data-move="left">←</button>
+                <button class="dpad-btn dpad-right" data-move="right">→</button>
+                <button class="dpad-btn dpad-down"  data-move="down">↓</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Info -->
+        <div class="ctrl-section">
+            <div class="ctrl-label" data-i18n="infoLabel">Information</div>
+            <div class="spec-info" id="specimen-info">
+                Erythrocytes of Rana temporaria.<br>Oval shape, nucleated cells.
+            </div>
+        </div>
+
+    </aside>
+</div>
+
+<!-- ── INSTRUCTIONS MODAL ── -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <button class="modal-close" id="modal-close">✕</button>
+        <div class="modal-title" id="modal-title">📖 Інструкція</div>
+
+        <div class="instr-section">
+            <div class="instr-heading" data-i18n="i-slides">Вибір препарату</div>
+            <ul class="instr-list">
+                <li><span class="icon">🔲</span> <span data-i18n="i-slides-1">Клацніть на картку препарату зліва (або прокрутіть горизонтально на планшеті), щоб завантажити його під об'єктив.</span></li>
+            </ul>
+        </div>
+
+        <div class="instr-section">
+            <div class="instr-heading" data-i18n="i-mag">Збільшення</div>
+            <ul class="instr-list">
+                <li><span class="icon">🔍</span> <span data-i18n="i-mag-1">Кнопки <b>3×</b>, <b>10×</b>, <b>40×</b> під окуляром змінюють об'єктив мікроскопа. При кожній зміні зображення оновлюється.</span></li>
+            </ul>
+        </div>
+
+        <div class="instr-section">
+            <div class="instr-heading" data-i18n="i-optics">Налаштування оптики</div>
+            <ul class="instr-list">
+                <li><span class="icon">🧪</span> <span data-i18n="i-opt-1"><b>Фокус препарату</b> — повзунок розмиття. Рухайте до різкого зображення, як при повороті гвинта фокусування.</span></li>
+                <li><span class="icon">📏</span> <span data-i18n="i-opt-2"><b>Шкала</b> — прозорість окулярної шкали (ретикля). 0 — прибрати шкалу, 100% — максимально видима.</span></li>
+                <li><span class="icon">💡</span> <span data-i18n="i-opt-3"><b>Освітлення</b> — яскравість підсвічування. Регулюйте як діафрагму конденсора.</span></li>
+            </ul>
+        </div>
+
+        <div class="instr-section">
+            <div class="instr-heading" data-i18n="i-move">Переміщення препарату</div>
+            <ul class="instr-list">
+                <li><span class="icon">🖱️</span> <span data-i18n="i-mv-1">Перетягніть зображення у вікні окуляра мишею або пальцем.</span></li>
+                <li><span class="icon">🕹️</span> <span data-i18n="i-mv-2">Кнопки D-pad на правій панелі переміщують предметний столик.</span></li>
+                <li><span class="icon">⌨️</span> <span data-i18n="i-mv-3">Клавіші <kbd class="kbd">↑</kbd> <kbd class="kbd">↓</kbd> <kbd class="kbd">←</kbd> <kbd class="kbd">→</kbd> на клавіатурі.</span></li>
+            </ul>
+        </div>
+
+        <div class="instr-section">
+            <div class="instr-heading" data-i18n="i-tip">Порада вчителя</div>
+            <ul class="instr-list">
+                <li><span class="icon">💡</span> <span data-i18n="i-tip-1">Спочатку встановіть об'єктив <b>3×</b>, знайдіть препарат. Потім збільшуйте та підлаштовуйте фокус — так само, як із справжнім мікроскопом!</span></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────
+const specimens = {
+    1: {
+        '3x' : 'https://i.postimg.cc/66nYy7sb/2025-06-12-234612.png',
+        '10x': 'https://i.postimg.cc/mg2wX8PK/2025-06-12-234625.png',
+        '40x': 'https://i.postimg.cc/yxyd2hDb/photo-2025-06-09-21-13-43-3.jpg'
+    },
+    2: {
+        '3x' : 'https://i.postimg.cc/Rh6dRFqh/Знімок_екрана_2025-06-12_234900.png',
+        '10x': 'https://i.postimg.cc/d1Snrdsg/Знімок_екрана_2025-06-12_234912.png',
+        '40x': 'https://i.postimg.cc/QMh63hYY/Знімок_екрана_2025-06-12_234920.png'
+    },
+    3: {
+        '3x' : 'https://i.postimg.cc/cLHRMCjS/2025-06-12-235513.png',
+        '10x': 'https://i.postimg.cc/7hk1gVvs/2025-06-12-235524.png',
+        '40x': 'https://i.postimg.cc/65zq00J7/photo-2025-06-09-21-13-44.jpg'
+    }
+};
+
+const slideNames = {
+    1: { ua: 'Кров жаби',               en: "Frog's Blood" },
+    2: { ua: 'Стовпчастий епітелій',    en: 'Columnar Epithelium' },
+    3: { ua: 'Артерія, вена та нерв',   en: 'Artery, Vein & Nerve' }
+};
+
+const specimenInfo = {
+    1: { ua: 'Еритроцити Rana temporaria.\nОвальна форма, ядро присутнє.', en: 'Erythrocytes of Rana temporaria.\nOval shape, nucleated cells.' },
+    2: { ua: 'Простий стовпчастий епітелій.\nВистилає кишечник та шлунок.', en: 'Simple columnar epithelium.\nIntestinal / gastric lining.' },
+    3: { ua: 'Поперечний зріз:\nПериферичний нерв, артерія та вена.', en: 'Cross-section:\nPeripheral nerve, artery and vein.' }
+};
+
+const i18n = {
+    ua: {
+        subtitle:   'Симулятор · Біологія · 7 клас',
+        helpBtn:    '📖 Інструкція',
+        slides:     'Препарати',
+        mag:        'Збільш.',
+        ready:      'Система готова',
+        optics:     'Оптика',
+        specFocus:  'Фокус препарату',
+        reticleFocus:'Шкала',
+        lamp:       'Освітлення',
+        stage:      'Предметний столик',
+        infoLabel:  'Інформація',
+        // modal
+        'i-slides':  'Вибір препарату',
+        'i-slides-1':'Клацніть на картку препарату зліва (або прокрутіть горизонтально на планшеті), щоб завантажити його під об\'єктив.',
+        'i-mag':     'Збільшення',
+        'i-mag-1':   'Кнопки <b>3×</b>, <b>10×</b>, <b>40×</b> під окуляром змінюють об\'єктив мікроскопа. При кожній зміні зображення оновлюється.',
+        'i-optics':  'Налаштування оптики',
+        'i-opt-1':   '<b>Фокус препарату</b> — повзунок розмиття. Рухайте до різкого зображення, як при повороті гвинта фокусування.',
+        'i-opt-2':   '<b>Шкала</b> — прозорість окулярної шкали (ретикля). 0 — прибрати шкалу, 100% — максимально видима.',
+        'i-opt-3':   '<b>Освітлення</b> — яскравість підсвічування. Регулюйте як діафрагму конденсора.',
+        'i-move':    'Переміщення препарату',
+        'i-mv-1':    'Перетягніть зображення у вікні окуляра мишею або пальцем.',
+        'i-mv-2':    'Кнопки D-pad на правій панелі переміщують предметний столик.',
+        'i-mv-3':    'Клавіші <kbd class="kbd">↑</kbd> <kbd class="kbd">↓</kbd> <kbd class="kbd">←</kbd> <kbd class="kbd">→</kbd> на клавіатурі.',
+        'i-tip':     'Порада вчителя',
+        'i-tip-1':   'Спочатку встановіть об\'єктив <b>3×</b>, знайдіть препарат. Потім збільшуйте та підлаштовуйте фокус — так само, як із справжнім мікроскопом!',
+        modalTitle:  '📖 Інструкція'
+    },
+    en: {
+        subtitle:   'Simulator · Biology · Grade 7',
+        helpBtn:    '📖 Instructions',
+        slides:     'Specimens',
+        mag:        'Mag',
+        ready:      'System ready',
+        optics:     'Optics',
+        specFocus:  'Specimen focus',
+        reticleFocus:'Reticle',
+        lamp:       'Illumination',
+        stage:      'Stage control',
+        infoLabel:  'Information',
+        // modal
+        'i-slides':  'Choosing a specimen',
+        'i-slides-1':'Click a specimen card on the left (or scroll horizontally on a tablet) to load it under the lens.',
+        'i-mag':     'Magnification',
+        'i-mag-1':   'The <b>3×</b>, <b>10×</b>, <b>40×</b> buttons below the eyepiece switch the objective. The image updates on each change.',
+        'i-optics':  'Optics controls',
+        'i-opt-1':   '<b>Specimen focus</b> — blur slider. Move until the image is sharp, just like turning the focus knob.',
+        'i-opt-2':   '<b>Reticle</b> — opacity of the eyepiece scale. 0 hides it; 100% makes it fully visible.',
+        'i-opt-3':   '<b>Illumination</b> — brightness of the light source. Adjust like the condenser diaphragm.',
+        'i-move':    'Moving the specimen',
+        'i-mv-1':    'Drag the image inside the eyepiece window with mouse or finger.',
+        'i-mv-2':    'The D-pad buttons on the right panel move the stage.',
+        'i-mv-3':    'Arrow keys <kbd class="kbd">↑</kbd> <kbd class="kbd">↓</kbd> <kbd class="kbd">←</kbd> <kbd class="kbd">→</kbd> on the keyboard.',
+        'i-tip':     "Teacher's tip",
+        'i-tip-1':   'Start with <b>3×</b>, find the specimen, then increase magnification and re-focus — just like a real microscope!',
+        modalTitle:  '📖 Instructions'
+    }
+};
+
+// ── STATE ─────────────────────────────────────────────────
+let st = { lang:'en', specimen:1, mag:'3x', tx:0, ty:0, dragging:false, sx:0, sy:0 };
+
+// ── DOM ───────────────────────────────────────────────────
+const $img    = document.getElementById('specimen-image');
+const $ret    = document.getElementById('reticle');
+const $badge  = document.getElementById('specimen-badge');
+const $fS     = document.getElementById('specimen-focus');
+const $rS     = document.getElementById('reticle-focus');
+const $lS     = document.getElementById('lamp-intensity');
+const $vF     = document.getElementById('val-focus');
+const $vR     = document.getElementById('val-reticle');
+const $vL     = document.getElementById('val-lamp');
+const $info   = document.getElementById('specimen-info');
+const $drag   = document.getElementById('drag-zone');
+const $modal  = document.getElementById('modal');
+const $mTitle = document.getElementById('modal-title');
+
+const clamp = (v,a,b) => Math.min(Math.max(v,a),b);
+
+// ── FILTERS ───────────────────────────────────────────────
+function applyFilters() {
+    const blur = parseFloat($fS.value);
+    const lamp = parseFloat($lS.value);
+    $img.style.filter = `blur(${blur}px) brightness(${lamp})`;
+    $ret.style.opacity = $rS.value;
+    $vF.textContent = parseFloat(blur).toFixed(0);
+    $vR.textContent = Math.round($rS.value * 100) + '%';
+    $vL.textContent = Math.round(lamp * 100) + '%';
+}
+
+// ── POSITION ──────────────────────────────────────────────
+function updatePos() {
+    $img.style.transform = `translate(calc(-50% + ${st.tx}px), calc(-50% + ${st.ty}px))`;
+}
+
+// ── LOAD SPECIMEN ─────────────────────────────────────────
+function loadSpecimen() {
+    $img.style.opacity = '0';
+    $img.src = specimens[st.specimen][st.mag];
+    st.tx = 0; st.ty = 0; updatePos();
+    $badge.textContent = slideNames[st.specimen][st.lang];
+    $info.innerHTML = specimenInfo[st.specimen][st.lang].replace(/\n/g,'<br>');
+    setTimeout(() => $img.style.opacity = '1', 320);
+}
+
+// ── STAGE MOVE ────────────────────────────────────────────
+function moveStage(dir) {
+    const step = 13, max = $drag.offsetWidth * 0.28;
+    if(dir==='up')    st.ty = clamp(st.ty-step,-max,max);
+    if(dir==='down')  st.ty = clamp(st.ty+step,-max,max);
+    if(dir==='left')  st.tx = clamp(st.tx-step,-max,max);
+    if(dir==='right') st.tx = clamp(st.tx+step,-max,max);
+    updatePos();
+}
+
+// ── LANGUAGE ──────────────────────────────────────────────
+function applyLang() {
+    const t = i18n[st.lang];
+    // simple text nodes
+    const simpleKeys = ['subtitle','helpBtn','slides','mag','ready','optics','specFocus',
+                        'reticleFocus','lamp','stage','infoLabel'];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const k = el.dataset.i18n;
+        if(simpleKeys.includes(k) && t[k]) el.textContent = t[k];
+    });
+    // modal HTML keys
+    const htmlKeys = ['i-slides','i-slides-1','i-mag','i-mag-1','i-optics',
+                      'i-opt-1','i-opt-2','i-opt-3','i-move','i-mv-1','i-mv-2','i-mv-3',
+                      'i-tip','i-tip-1'];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const k = el.dataset.i18n;
+        if(htmlKeys.includes(k) && t[k]) el.innerHTML = t[k];
+    });
+    // slide names
+    document.querySelectorAll('[data-slide-name]').forEach(el => {
+        el.textContent = slideNames[parseInt(el.dataset.slideName)][st.lang];
+    });
+    $badge.textContent = slideNames[st.specimen][st.lang];
+    $info.innerHTML = specimenInfo[st.specimen][st.lang].replace(/\n/g,'<br>');
+    $mTitle.textContent = t.modalTitle;
+    document.querySelectorAll('.lang-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.lang === st.lang)
+    );
+}
+
+// ── DRAG ──────────────────────────────────────────────────
+$drag.addEventListener('mousedown', e => {
+    st.dragging=true; st.sx=e.clientX; st.sy=e.clientY;
+});
+document.addEventListener('mousemove', e => {
+    if(!st.dragging) return;
+    const max = $drag.offsetWidth*0.28;
+    st.tx = clamp(st.tx+e.clientX-st.sx,-max,max);
+    st.ty = clamp(st.ty+e.clientY-st.sy,-max,max);
+    st.sx=e.clientX; st.sy=e.clientY; updatePos();
+});
+document.addEventListener('mouseup', ()=>{ st.dragging=false; });
+
+$drag.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t=e.touches[0]; st.dragging=true; st.sx=t.clientX; st.sy=t.clientY;
+},{passive:false});
+$drag.addEventListener('touchmove', e => {
+    e.preventDefault(); if(!st.dragging) return;
+    const max=$drag.offsetWidth*0.28, t=e.touches[0];
+    st.tx=clamp(st.tx+t.clientX-st.sx,-max,max);
+    st.ty=clamp(st.ty+t.clientY-st.sy,-max,max);
+    st.sx=t.clientX; st.sy=t.clientY; updatePos();
+},{passive:false});
+$drag.addEventListener('touchend', ()=>{ st.dragging=false; });
+
+// ── EVENTS ────────────────────────────────────────────────
+document.querySelectorAll('.slide-card').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.slide-card').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active'); st.specimen=parseInt(c.dataset.slide); loadSpecimen();
+}));
+
+document.querySelectorAll('.mag-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.mag-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); st.mag=b.dataset.mag; loadSpecimen();
+}));
+
+document.querySelectorAll('.lang-btn').forEach(b => b.addEventListener('click', () => {
+    st.lang=b.dataset.lang; applyLang();
+}));
+
+document.querySelectorAll('.dpad-btn').forEach(b => b.addEventListener('click', () => moveStage(b.dataset.move)));
+
+[$fS,$rS,$lS].forEach(s=>s.addEventListener('input',applyFilters));
+
+document.addEventListener('keydown', e => {
+    const m={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'};
+    if(m[e.key]){ e.preventDefault(); moveStage(m[e.key]); }
+});
+
+// ── MODAL ─────────────────────────────────────────────────
+document.getElementById('help-btn').addEventListener('click', () => {
+    $modal.classList.add('open');
+});
+document.getElementById('modal-close').addEventListener('click', () => {
+    $modal.classList.remove('open');
+});
+$modal.addEventListener('click', e => {
+    if(e.target === $modal) $modal.classList.remove('open');
+});
+document.addEventListener('keydown', e => {
+    if(e.key==='Escape') $modal.classList.remove('open');
+});
+
+// ── INIT ──────────────────────────────────────────────────
+applyLang();
+loadSpecimen();
+applyFilters();
+</script>
+</body>
+</html>
